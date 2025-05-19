@@ -108,7 +108,7 @@ export function NavBar() {
               </nav>
 
               {/* Buttons */}
-              {userProfile?.role_id === 2 ? (
+              {userProfile ? (
                 isDashboard ? (
                   <Link
                     href="/"
@@ -232,7 +232,7 @@ export function NavBar() {
                   </NavLink>
                 </>
               )}
-              {userProfile?.role_id === 2 ? (
+              {userProfile ? (
                 <NavLink
                   href={isDashboard ? "/" : "/admin/dashboard"}
                   isActive={pathname.includes("admin")}
