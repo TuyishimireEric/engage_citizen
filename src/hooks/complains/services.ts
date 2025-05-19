@@ -5,10 +5,12 @@ export const FC_getComplaints = async ({
   limit = 10,
   page = 1,
   isPublic = true,
+  search = "",
 }: {
   limit?: number;
   page?: number;
   isPublic?: boolean;
+  search?: string;
 }) => {
   const from = (page - 1) * limit;
   const to = from + limit - 1;
@@ -20,7 +22,25 @@ export const FC_getComplaints = async ({
       .order("updated_at", { ascending: false })
       .range(from, to);
 
-    if (isPublic) {
+    // If search string is provided
+    if (search && search.trim() !== "") {
+      const isTrackingCodeFormat = /^TRK-\d{4}-\d{5}$/i.test(search.trim());
+
+      if (isTrackingCodeFormat) {
+        query = supabase
+          .from("Complaints")
+          .select("*")
+          .ilike("tracking_code", `%${search.trim()}%`);
+      } else {
+        query = query.or(
+          `title.ilike.%${search.trim()}%,description.ilike.%${search.trim()}%`
+        );
+
+        if (isPublic) {
+          query = query.eq("is_public", true);
+        }
+      }
+    } else if (isPublic) {
       query = query.eq("is_public", true);
     }
 
@@ -31,9 +51,9 @@ export const FC_getComplaints = async ({
     }
 
     return data;
-  } catch (err: any) {
-    console.error("Error fetching complaints:", err);
-    throw new Error(`Failed to fetch complaints: ${err.message}`);
+  } catch (err) {
+    const error = err as Error;
+    throw new Error(`Failed to fetch complaints: ${error.message}`);
   }
 };
 
@@ -49,33 +69,13 @@ export const FC_createComplaint = async (complaintData: ComplaintI) => {
   return { data, error };
 };
 
-export const FC_updateComplaint = async (id: string, updates: any) => {
-  try {
-    const { data, error } = await supabase
-      .from("Complaints")
-      .update(updates)
-      .eq("id", id)
-      .select();
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    console.log("Updated complaint:", data);
-    return data;
-  } catch (err: any) {
-    console.error("Error updating complaint:", err);
-    throw new Error(`Failed to update complaint: ${err.message}`);
-  }
-};
-
 export const FC_getComplaintDetails = async ({
   complaint_id,
   tracking_code,
 }: {
   complaint_id?: string;
   tracking_code?: string;
-}) : Promise<ComplaintI>=> {
+}): Promise<ComplaintI> => {
   try {
     let query = supabase.from("Complaints").select("*");
 
@@ -92,8 +92,8 @@ export const FC_getComplaintDetails = async ({
     }
 
     return data[0] as ComplaintI;
-  } catch (err: any) {
-    console.error("Error fetching complaint details:", err);
-    throw new Error(`Failed to fetch complaint details: ${err.message}`);
+  } catch (err) {
+    const error = err as Error;
+    throw new Error(`Failed to fetch complaints: ${error.message}`);
   }
 };

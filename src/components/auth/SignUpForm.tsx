@@ -20,7 +20,7 @@ export function SignupForm({
   const submitHandler: SubmitHandler<
     SignupFormData & { confirmPassword: string }
   > = (data) => {
-    const { confirmPassword, ...signupData } = data;
+    const {  ...signupData } = data;
     onSubmit(signupData);
   };
 

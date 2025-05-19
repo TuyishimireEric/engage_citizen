@@ -4,11 +4,9 @@ import { SubmitHandler, useForm } from "react-hook-form";
 export function LoginForm({
   onSubmit,
   isLoading,
-  onForgotPassword,
 }: {
   onSubmit: (data: LoginFormData) => Promise<boolean>;
   isLoading: boolean;
-  onForgotPassword: () => void;
 }) {
   const {
     register,
@@ -84,17 +82,6 @@ export function LoginForm({
             {errors.password.message}
           </p>
         )}
-      </div>
-
-      <div className="text-right">
-        <button
-          type="button"
-          className="text-sm text-green-600 dark:text-green-400 hover:underline"
-          onClick={onForgotPassword}
-          disabled={isLoading}
-        >
-          Forgot your password?
-        </button>
       </div>
 
       <button

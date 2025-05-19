@@ -4,7 +4,7 @@ import { Welcome } from "@/components/home/Welcome";
 
 export default function Home() {
   return (
-    <div className="bg-primary-500 text-primary-100">
+    <div>
       <Welcome />
       <HowItWorks />
       <Footer />

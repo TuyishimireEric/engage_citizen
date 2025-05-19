@@ -1,13 +1,8 @@
-import { useState, useEffect } from 'react';
-import { createClient, User, Session } from '@supabase/supabase-js';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect, useCallback } from 'react';
+import { User, Session } from '@supabase/supabase-js';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/utils/supabase';
 
-// Initialize Supabase client
-// Replace these with your actual Supabase URL and anon key
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Define the UserProfile interface based on your separate profiles table
 export interface UserProfile {
@@ -31,16 +26,18 @@ export interface useUserReturn {
   refreshProfile: () => Promise<void>;
 }
 
+// Cache keys
+const USER_QUERY_KEY = 'user';
+const PROFILE_QUERY_KEY = 'userProfile';
+
 const useUser = (): useUserReturn => {
-  const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<Error | null>(null);
-  
   const queryClient = useQueryClient();
 
-  const fetchProfile = async (userId: string): Promise<UserProfile | null> => {
+  // Fetch user profile function
+  const fetchProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
+    if (!userId) return null;
+    
     try {
       const { data, error: profileError } = await supabase
         .from('Profiles')
@@ -58,18 +55,21 @@ const useUser = (): useUserReturn => {
       console.error('Exception fetching profile:', err);
       return null;
     }
-  };
+  }, []);
 
-  const refreshProfile = async (): Promise<void> => {
-    if (!user) return;
-    
-    try {
-      const fetchedProfile = await fetchProfile(user.id);
-      setUserProfile(fetchedProfile);
-    } catch (err) {
-      console.error('Failed to refresh profile:', err);
-    }
-  };
+  // Use React Query to fetch and cache the user profile
+  const {
+    data: userProfile,
+    isLoading: profileLoading,
+    error: profileError,
+    refetch: refetchProfile
+  } = useQuery({
+    queryKey: [PROFILE_QUERY_KEY, session?.user?.id],
+    queryFn: () => fetchProfile(session?.user?.id || ''),
+    enabled: !!session?.user?.id, // Only run query if we have a user ID
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: 3,
+  });
 
   // Use React Query's useMutation for logout
   const logoutMutation = useMutation({
@@ -81,24 +81,31 @@ const useUser = (): useUserReturn => {
       return true;
     },
     onSuccess: () => {
-      // Clear profile on logout
-      setUserProfile(null);
-      // Invalidate and refetch relevant queries
-      queryClient.invalidateQueries({ queryKey: ['user'] });
-      queryClient.invalidateQueries({ queryKey: ['userProfile'] });
+      // Clear user data on logout
+      queryClient.setQueryData([USER_QUERY_KEY], null);
+      queryClient.setQueryData([PROFILE_QUERY_KEY, session?.user?.id], null);
+      
+      // Invalidate queries
+      queryClient.invalidateQueries({ queryKey: [USER_QUERY_KEY] });
+      queryClient.invalidateQueries({ queryKey: [PROFILE_QUERY_KEY] });
     },
     onError: (err) => {
-      setError(err instanceof Error ? err : new Error('Error during logout'));
       console.error('Logout error:', err);
     }
   });
 
+  // Refresh profile function (exposed in the hook return)
+  const refreshProfile = async (): Promise<void> => {
+    if (!session?.user?.id) return;
+    await refetchProfile();
+  };
+
+  // Effect to handle auth state and session
   useEffect(() => {
-    // Get initial session
+    let authStateSubscription: { unsubscribe: () => void } | null = null;
+    
     const initAuth = async () => {
       try {
-        setLoading(true);
-        
         // Get current session
         const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
         
@@ -106,57 +113,61 @@ const useUser = (): useUserReturn => {
           throw sessionError;
         }
         
+        // Update session state
         setSession(currentSession);
-        setUser(currentSession?.user || null);
         
-        // Fetch profile if user is logged in
+        // If we have a session, prefetch and cache the profile
         if (currentSession?.user) {
-          const fetchedProfile = await fetchProfile(currentSession.user.id);
-          setUserProfile(fetchedProfile);
+          const profile = await fetchProfile(currentSession.user.id);
+          queryClient.setQueryData([PROFILE_QUERY_KEY, currentSession.user.id], profile);
         }
         
         // Set up auth state change listener
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, newSession) => {
             setSession(newSession);
-            setUser(newSession?.user || null);
             
-            // On sign in or token refresh, fetch the profile
-            if (newSession?.user) {
-              if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-                const fetchedProfile = await fetchProfile(newSession.user.id);
-                setUserProfile(fetchedProfile);
+            // Handle different auth events
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+              if (newSession?.user) {
+                // Fetch profile and update cache immediately
+                const profile = await fetchProfile(newSession.user.id);
+                queryClient.setQueryData([PROFILE_QUERY_KEY, newSession.user.id], profile);
+                
+                // Also trigger a refetch to ensure data is fresh
+                queryClient.invalidateQueries({ queryKey: [PROFILE_QUERY_KEY, newSession.user.id] });
               }
-            } else {
-              // If signed out, clear profile
-              setUserProfile(null);
+            } else if (event === 'SIGNED_OUT') {
+              // Clear cached data
+              queryClient.setQueryData([USER_QUERY_KEY], null);
+              queryClient.setQueryData([PROFILE_QUERY_KEY], null);
             }
-            
-            setLoading(false);
           }
         );
         
-        setLoading(false);
-        
-        // Cleanup subscription on unmount
-        return () => {
-          subscription.unsubscribe();
-        };
+        authStateSubscription = subscription;
       } catch (err) {
-        setError(err instanceof Error ? err : new Error('Unknown error during authentication'));
-        setLoading(false);
+        console.error('Auth initialization error:', err);
       }
     };
     
     initAuth();
-  }, []);
+    
+    // Cleanup subscription on unmount
+    return () => {
+      authStateSubscription?.unsubscribe();
+    };
+  }, [fetchProfile, queryClient]);
+
+  // Combine loading states
+  const loading = profileLoading || !session;
 
   return {
-    user,
+    user: session?.user || null,
     session,
-    userProfile,
+    userProfile: userProfile || null,
     loading,
-    error,
+    error: profileError as Error | null,
     logout: logoutMutation.mutate,
     isLoggingOut: logoutMutation.isPending,
     refreshProfile

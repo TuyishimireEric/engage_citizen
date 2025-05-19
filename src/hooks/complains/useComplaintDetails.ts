@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FC_getComplaintDetails, FC_getComplaints } from "./services";
+import { FC_getComplaintDetails } from "./services";
 import { supabase } from "@/utils/supabase";
 
 const useComplaintDetails = ({
@@ -22,6 +22,7 @@ const useComplaintDetails = ({
         tracking_code,
       }),
     staleTime: 1000 * 60 * 60, // 1 hour
+    enabled: !!complaint_id,
   });
 
   useEffect(() => {

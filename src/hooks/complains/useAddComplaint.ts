@@ -1,8 +1,8 @@
 import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
-import { supabase } from "@/utils/supabase";
 import { useMutation } from "@tanstack/react-query";
 import { FC_createComplaint } from "./services";
+import { FC_analyzeCategory } from "../categories/services";
 
 export interface ComplaintFormData {
   title: string;
@@ -55,11 +55,22 @@ export function useAddComplaint() {
       try {
         const newTrackingId = generateTrackingId();
 
+        const generatedCategory = await FC_analyzeCategory({
+          availableCategories: [
+            "Unknown",
+            "Electricity",
+            "Health",
+            "Water",
+            "Education",
+          ],
+          complaintText: data.title + " " + data.description,
+        });
+
         const complaintData = {
           ...data,
           tracking_code: newTrackingId,
-          category_id: "5b2fdf00-14d3-42f4-a9c1-9927d86f3d93",
-          status: "pending",
+          category: generatedCategory.toLowerCase(),
+          status: "submitted",
           created_by: null,
           is_public: is_public,
         };
@@ -78,12 +89,8 @@ export function useAddComplaint() {
       setShowSuccessModal(true);
       reset();
     },
-    onError: (err: any) => {
-      if (err.name === "AbortError") {
-        setError("Request was aborted due to timeout.");
-      } else {
-        setError("An unexpected error occurred.");
-      }
+    onError: () => {
+      setError("An unexpected error occurred.");
     },
   });
 

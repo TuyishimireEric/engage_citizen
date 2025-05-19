@@ -1,5 +1,4 @@
 import { CheckCircle, XCircle, X } from "lucide-react";
-import { ReactNode } from "react";
 
 interface NotificationModalProps {
   type: "success" | "error";

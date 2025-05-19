@@ -1,10 +1,17 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Info, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
+import {
+  Info,
+  Eye,
+  EyeOff,
+  Loader2,
+  ArrowLeft,
+} from "lucide-react";
 import { useAddComplaint } from "@/hooks/complains/useAddComplaint";
 import { SuccessModal } from "@/components/complaints/Success";
 import { NotificationModal } from "@/components/common/NotificationModal";
+import Link from "next/link";
 
 const AddComplaint = () => {
   const {
@@ -32,10 +39,19 @@ const AddComplaint = () => {
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white to-green-50 dark:from-gray-900 dark:to-gray-800">
-      <main className="container mx-auto px-4 sm:px-6 py-8">
-        <div className="max-w-3xl mx-auto py-8">
+    <div className="min-h-screen bg-gradient-to-br from-white to-green-50 py-12 dark:from-gray-900 dark:to-gray-800">
+      <main className="container mx-auto px-4 sm:px-6 ">
+        <div className="max-w-3xl mx-auto ">
           <div className="mb-8">
+            <div className="flex items-center mb-4">
+              <Link
+                href={"/"}
+                className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Home
+              </Link>
+            </div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-50">
               Add New Complaint
             </h1>

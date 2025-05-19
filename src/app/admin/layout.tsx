@@ -14,7 +14,7 @@ export default function RootLayout({
   return (
     <div className="flex z-20 h-screen max-h-[90vh] w-full p-0 relative">
       <SidebarMenu />
-      <div className="max-h-full flex-grow h-full bg-gray-50 shadow-inner rounded-tl-3xl py-2 overflow-y-auto">
+      <div className="max-h-full flex-grow h-full bg-gray-50 dark:bg-gray-800 shadow-inner rounded-tl-3xl py-2 overflow-y-auto">
         {children}
       </div>
     </div>
